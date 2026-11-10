@@ -64,6 +64,7 @@
   <div class="row sub"><span>New York</span><b id="g-ny">–</b></div>
   <div class="note" id="note"></div>
 </div>
+<script src="rates.js"></script>
 <script>
 (function () {
   var BUILT_IN = ["scene-night", "scene-golden", "scene-water", "scene-fog", "scene-dawn", "grose-valley",
@@ -94,7 +95,7 @@
     if (fill.textContent !== t) { fill.textContent = t; rim.textContent = t; place(); }
     var d = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
     $("date").innerHTML = esc(d) + (wx ? icon(wx.code, wx.is_day) + '<span class="wx">' + Math.round(wx.temp) + "° " + esc(wx.text) + "</span>" : "");
-    try { $("ist").textContent = now.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" }); } catch (e) {}
+    $("ist").textContent = window.indiaTime(now);
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   // The digits show the photo behind them: line the fill's copy of the photo up with the screen.
@@ -142,35 +143,13 @@
   }
   function next() { show(slides[i % slides.length]); i++; }
 
-  // ---- the card: rupee, dirham and gold (free sources, no account), kept for 30 minutes ----
-  // Indian gold is quoted with the import duty on top of the world price (6% since July 2024); GST is added at the shop.
-  var INDIA_DUTY = 1.06, OZ = 31.1035, KEEP = 30 * 60000;
-  function money(n, cur, d) {
-    try { return new Intl.NumberFormat(cur === "INR" ? "en-IN" : "en-US", { style: "currency", currency: cur, maximumFractionDigits: d || 0 }).format(n); }
-    catch (e) { return cur + " " + Math.round(n); }
-  }
-  function showRates(r) {
-    if (!r || !r.inr || !r.gold) return;
-    $("usd").textContent = money(r.inr, "INR", 2);
-    var g = r.gold / OZ * (22 / 24) * 8;   // 8 g of 22 carat gold (one sovereign), in dollars
-    $("g-hyd").textContent = "≈ " + money(g * r.inr * INDIA_DUTY, "INR");
-    $("g-dxb").textContent = money(g * r.aed, "AED");
-    $("g-ny").textContent = money(g, "USD");
-    $("note").textContent = "Gold from the world price · " + new Date(r.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  }
+  // ---- the card: rupee and gold (rates.js, shared with the home's widgets) ----
+  var KEEP = window.couchRates.KEEP;
   function rates() {
-    var kept = null;
-    try { kept = JSON.parse(localStorage.getItem("saver-rates")); } catch (e) {}
-    if (kept) showRates(kept);
-    if (kept && Date.now() - kept.at < KEEP) return;
-    Promise.all([
-      fetch("https://open.er-api.com/v6/latest/USD").then(function (r) { return r.json(); }),
-      fetch("https://api.gold-api.com/price/XAU").then(function (r) { return r.json(); })
-    ]).then(function (a) {
-      var r = { inr: a[0].rates.INR, aed: a[0].rates.AED, gold: a[1].price, at: Date.now() };
-      showRates(r);
-      try { localStorage.setItem("saver-rates", JSON.stringify(r)); } catch (e) {}
-    }).catch(function () {});
+    window.couchRates(function (r) {
+      $("usd").textContent = r.usd; $("g-hyd").textContent = r.hyd; $("g-dxb").textContent = r.dxb; $("g-ny").textContent = r.ny;
+      $("note").textContent = "Gold from the world price · " + r.at;
+    });
   }
 
   function start() {
