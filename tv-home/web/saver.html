@@ -58,7 +58,7 @@
   <div class="row"><span class="k">India</span><b id="ist">–</b></div>
   <div class="row"><span class="k">$1</span><b id="usd">–</b></div>
   <div class="rule"></div>
-  <div class="row"><span class="k">Gold 24K</span></div>
+  <div class="row"><span class="k">Gold 22K · 8 g</span></div>
   <div class="row sub"><span>Hyderabad</span><b id="g-hyd">–</b></div>
   <div class="row sub"><span>Dubai</span><b id="g-dxb">–</b></div>
   <div class="row sub"><span>New York</span><b id="g-ny">–</b></div>
@@ -152,10 +152,10 @@
   function showRates(r) {
     if (!r || !r.inr || !r.gold) return;
     $("usd").textContent = money(r.inr, "INR", 2);
-    var g = r.gold / OZ;
-    $("g-hyd").textContent = "≈ " + money(g * r.inr * INDIA_DUTY * 10, "INR") + " /10g";
-    $("g-dxb").textContent = money(g * r.aed, "AED") + " /g";
-    $("g-ny").textContent = money(r.gold, "USD") + " /oz";
+    var g = r.gold / OZ * (22 / 24) * 8;   // 8 g of 22 carat gold (one sovereign), in dollars
+    $("g-hyd").textContent = "≈ " + money(g * r.inr * INDIA_DUTY, "INR");
+    $("g-dxb").textContent = money(g * r.aed, "AED");
+    $("g-ny").textContent = money(g, "USD");
     $("note").textContent = "Gold from the world price · " + new Date(r.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   }
   function rates() {
