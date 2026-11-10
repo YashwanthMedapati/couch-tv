@@ -22,6 +22,8 @@ class SaverDream : DreamService() {
         isInteractive = false
         isFullscreen = true
         App.startService(this)
+        // the page asks this app for the weather, signed in the way the home is
+        android.webkit.CookieManager.getInstance().setCookie("http://127.0.0.1:${Store.port}", "couchtv_token=${Auth.internalToken}; path=/")
         val w = WebView(this).apply {
             setBackgroundColor(android.graphics.Color.BLACK)
             settings.javaScriptEnabled = true

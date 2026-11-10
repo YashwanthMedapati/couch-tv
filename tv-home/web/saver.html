@@ -1,7 +1,10 @@
 <!doctype html>
 <!-- The Couch TV screensaver (on-TV app, SaverDream): full-screen photos that fade one into the next,
-     with the home's glass clock over them. The slide list is backgrounds/mine/saver.json (your own
-     pictures, made on a computer), else the home's built-in scenery. -->
+     with the home's glass clock over them, the date and weather beside it, and a small card with the
+     time in India, the dollar in rupees and gold in Hyderabad, Dubai and New York.
+     The slide list is backgrounds/mine/saver.json (made on a computer by make_photos.py, which also
+     picks where the clock and the card sit on each photo, away from faces and animals), else the
+     home's built-in scenery. -->
 <html>
 <head>
 <meta charset="utf-8">
@@ -12,60 +15,178 @@
   html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
   .slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 2400ms ease-in-out; }
   .slide.on { opacity: 1; }
-  .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0) 45%); }
-  .date { position: absolute; left: 0; right: 0; top: 5.5vh; text-align: center; font: 500 3.2vh "Inter", sans-serif;
-          color: rgba(255,255,255,0.92); text-shadow: 0 0.2vh 1vh rgba(0,0,0,0.35); letter-spacing: 0.02em; }
-  .clock { position: absolute; left: 0; right: 0; top: 10vh; text-align: center; white-space: nowrap;
-           font: 300 41vh/0.82 "Antonio", "Arial Narrow", sans-serif; letter-spacing: -0.02em;
-           filter: drop-shadow(0 0.6vh 2.6vh rgba(0,0,0,0.22)); }
+
+  /* the clock with the date and weather: placed per photo (x left/center/right, y top/bottom, size in vh) */
+  .group { position: absolute; transition: opacity 700ms ease-in-out; }
+  .group.hide, .card.hide { opacity: 0; }
+  /* a soft dark glow behind it, so it reads over a bright sky without a box */
+  .group::before { content: ""; position: absolute; inset: -6vh -8vh; z-index: -1;
+                   background: radial-gradient(closest-side, rgba(0,0,0,0.30), rgba(0,0,0,0)); }
+  .date { font: 500 3vh "Inter", sans-serif; color: rgba(255,255,255,0.94); letter-spacing: 0.02em; white-space: nowrap;
+          text-shadow: 0 0.2vh 1vh rgba(0,0,0,0.45); margin: 0 0.4vh 0.6vh; }
+  .date .wx { color: rgba(255,255,255,0.80); font-weight: 400; }
+  .date svg { width: 3vh; height: 3vh; vertical-align: -0.55vh; margin: 0 0.5vh 0 1.4vh; fill: none; stroke: currentColor;
+              stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .clock { position: relative; white-space: nowrap; font-family: "Antonio", "Arial Narrow", sans-serif; font-weight: 300;
+           line-height: 0.82; letter-spacing: -0.02em; filter: drop-shadow(0 0.6vh 2.6vh rgba(0,0,0,0.25)); }
   .clock span { display: inline-block; padding: 0.2em 0; margin: -0.2em 0; }
   .fill { color: transparent; -webkit-background-clip: text; background-clip: text; background-size: 100vw 100vh;
           background-repeat: no-repeat; filter: brightness(1.25) saturate(1.1); opacity: 0.92; }
-  .rim { position: absolute; left: 0; right: 0; top: 0; color: rgba(255,255,255,0.1); -webkit-text-stroke: 0.15vh rgba(255,255,255,0.6); }
+  .rim { position: absolute; top: 0; color: rgba(255,255,255,0.1); -webkit-text-stroke: 0.15vh rgba(255,255,255,0.6); }
+
+  /* the info card: the home's glass, without the blur (cheap to draw on a slow TV) */
+  .card { position: absolute; width: 25vw; box-sizing: border-box; padding: 2.2vh 2.6vh 2vh; border-radius: 2.4vh;
+          background: linear-gradient(160deg, rgba(30,26,34,0.52), rgba(14,12,18,0.40));
+          box-shadow: inset 0 0 0 0.12vh rgba(255,255,255,0.20), 0 1.6vh 4vh rgba(0,0,0,0.25);
+          font: 450 2.1vh/1 "Inter", sans-serif; color: #fff; transition: opacity 700ms ease-in-out; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 2vh; padding: 0.75vh 0; white-space: nowrap; }
+  .row b { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .k { color: rgba(255,255,255,0.62); font-size: 1.6vh; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+  .sub { padding-left: 1.4vh; }
+  .sub span:first-child { color: rgba(255,255,255,0.78); }
+  .rule { height: 0.12vh; background: rgba(255,255,255,0.14); margin: 1vh 0 0.6vh; }
+  .note { color: rgba(255,255,255,0.45); font-size: 1.35vh; margin-top: 0.9vh; }
 </style>
 </head>
 <body>
 <img class="slide" id="a" alt=""><img class="slide" id="b" alt="">
-<div class="shade"></div>
-<div class="date" id="date"></div>
-<div class="clock" id="clock"><span class="fill" id="fill"></span><span class="rim" id="rim"></span></div>
+<div class="group hide" id="group">
+  <div class="date" id="date"></div>
+  <div class="clock" id="clock"><span class="fill" id="fill"></span><span class="rim" id="rim"></span></div>
+</div>
+<div class="card hide" id="card">
+  <div class="row"><span class="k">India</span><b id="ist">–</b></div>
+  <div class="row"><span class="k">$1</span><b id="usd">–</b></div>
+  <div class="rule"></div>
+  <div class="row"><span class="k">Gold 24K</span></div>
+  <div class="row sub"><span>Hyderabad</span><b id="g-hyd">–</b></div>
+  <div class="row sub"><span>Dubai</span><b id="g-dxb">–</b></div>
+  <div class="row sub"><span>New York</span><b id="g-ny">–</b></div>
+  <div class="note" id="note"></div>
+</div>
 <script>
 (function () {
   var BUILT_IN = ["scene-night", "scene-golden", "scene-water", "scene-fog", "scene-dawn", "grose-valley",
     "vang-vieng-sunset", "aresquiers-beach", "albury-storm", "tessellated-pavement"].map(function (n) { return "backgrounds/" + n + ".jpg"; });
-  var slides = BUILT_IN, every = 12000, i = 0, front = document.getElementById("a"), back = document.getElementById("b");
-  var fill = document.getElementById("fill"), rim = document.getElementById("rim"), clock = document.getElementById("clock");
+  var slides = BUILT_IN, every = 12000, i = 0, front = $("a"), back = $("b");
+  var fill = $("fill"), rim = $("rim"), clock = $("clock"), group = $("group"), card = $("card");
+  function $(id) { return document.getElementById(id); }
 
-  function hm() {
-    var d = new Date(), h = d.getHours() % 12 || 12, m = d.getMinutes();
-    return h + ":" + (m < 10 ? "0" : "") + m;
+  // ---- the clock, date and weather ----
+  var wx = null;
+  var ICON = {
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+    moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 11 3.5 3.5 0 0 0 7 18z"/>',
+    rain: '<path d="M7 14h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 7 3.5 3.5 0 0 0 7 14z"/><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/>',
+    snow: '<path d="M7 14h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 7 3.5 3.5 0 0 0 7 14z"/><path d="M8 18h.01M12 20h.01M16 18h.01"/>',
+    fog: '<path d="M4 9h16M6 13h12M4 17h16"/>',
+    storm: '<path d="M7 14h10a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.1 7 3.5 3.5 0 0 0 7 14z"/><path d="M12.5 15l-2 3.5h3l-2 3.5"/>'
+  };
+  function icon(code, day) {   // WMO weather codes, as the home's weather uses
+    var k = code <= 1 ? (day ? "sun" : "moon") : code <= 3 ? "cloud" : code <= 48 ? "fog" : code <= 67 || (code >= 80 && code <= 82) ? "rain"
+      : code <= 86 ? "snow" : "storm";
+    return '<svg viewBox="0 0 24 24">' + ICON[k] + "</svg>";
   }
+  function hm(d) { var h = d.getHours() % 12 || 12, m = d.getMinutes(); return h + ":" + (m < 10 ? "0" : "") + m; }
   function tick() {
-    var t = hm();
+    var now = new Date(), t = hm(now);
     if (fill.textContent !== t) { fill.textContent = t; rim.textContent = t; place(); }
-    document.getElementById("date").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+    var d = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+    $("date").innerHTML = esc(d) + (wx ? icon(wx.code, wx.is_day) + '<span class="wx">' + Math.round(wx.temp) + "° " + esc(wx.text) + "</span>" : "");
+    try { $("ist").textContent = now.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" }); } catch (e) {}
   }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   // The digits show the photo behind them: line the fill's copy of the photo up with the screen.
   function place() {
-    var x = clock.offsetLeft + fill.offsetLeft, y = clock.offsetTop + fill.offsetTop;
-    fill.style.backgroundPosition = -x + "px " + -y + "px";
-    rim.style.left = fill.offsetLeft + "px"; rim.style.right = "auto";
+    var r = fill.getBoundingClientRect();
+    fill.style.backgroundPosition = -r.left + "px " + -r.top + "px";
+    rim.style.left = fill.offsetLeft + "px";
   }
-  function show(src) {
+  function weather() {
+    fetch("/api/weather", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.text) { wx = j; tick(); } }).catch(function () {});
+  }
+
+  // ---- where the clock and the card go on this photo ----
+  function layout(s) {
+    var c = s.clock || { x: "center", y: "top", size: 41 };
+    clock.style.fontSize = c.size + "vh";
+    group.style.left = group.style.right = group.style.top = group.style.bottom = group.style.transform = "";
+    group.style.textAlign = c.x;
+    if (c.x === "left") group.style.left = "5vw";
+    else if (c.x === "right") group.style.right = "5vw";
+    else { group.style.left = "50%"; group.style.transform = "translateX(-50%)"; }
+    if (c.y === "bottom") group.style.bottom = "5vh"; else group.style.top = "5vh";
+    card.style.display = s.card ? "" : "none";
+    if (s.card) {
+      card.style.top = s.card[0] === "t" ? "6vh" : ""; card.style.bottom = s.card[0] === "b" ? "6vh" : "";
+      card.style.left = s.card[1] === "l" ? "4vw" : ""; card.style.right = s.card[1] === "r" ? "4vw" : "";
+    }
+  }
+
+  function show(s) {
+    var src = s.src;
     back.onload = function () {
       back.classList.add("on"); front.classList.remove("on");
       var t = front; front = back; back = t;
-      setTimeout(function () { fill.style.backgroundImage = 'url("' + src + '")'; }, 1200);   // halfway through the fade
+      group.classList.add("hide"); card.classList.add("hide");
+      setTimeout(function () {   // halfway through the fade: move to this photo's spot and fade back in
+        layout(s);
+        fill.style.backgroundImage = 'url("' + src + '")';
+        place();
+        group.classList.remove("hide"); card.classList.remove("hide");
+      }, 1200);
     };
     back.src = src;
   }
   function next() { show(slides[i % slides.length]); i++; }
 
-  function start() { tick(); next(); setInterval(next, every); setInterval(tick, 5000); }
+  // ---- the card: rupee, dirham and gold (free sources, no account), kept for 30 minutes ----
+  // Indian gold is quoted with the import duty on top of the world price (6% since July 2024); GST is added at the shop.
+  var INDIA_DUTY = 1.06, OZ = 31.1035, KEEP = 30 * 60000;
+  function money(n, cur, d) {
+    try { return new Intl.NumberFormat(cur === "INR" ? "en-IN" : "en-US", { style: "currency", currency: cur, maximumFractionDigits: d || 0 }).format(n); }
+    catch (e) { return cur + " " + Math.round(n); }
+  }
+  function showRates(r) {
+    if (!r || !r.inr || !r.gold) return;
+    $("usd").textContent = money(r.inr, "INR", 2);
+    var g = r.gold / OZ;
+    $("g-hyd").textContent = "≈ " + money(g * r.inr * INDIA_DUTY * 10, "INR") + " /10g";
+    $("g-dxb").textContent = money(g * r.aed, "AED") + " /g";
+    $("g-ny").textContent = money(r.gold, "USD") + " /oz";
+    $("note").textContent = "Gold from the world price · " + new Date(r.at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  function rates() {
+    var kept = null;
+    try { kept = JSON.parse(localStorage.getItem("saver-rates")); } catch (e) {}
+    if (kept) showRates(kept);
+    if (kept && Date.now() - kept.at < KEEP) return;
+    Promise.all([
+      fetch("https://open.er-api.com/v6/latest/USD").then(function (r) { return r.json(); }),
+      fetch("https://api.gold-api.com/price/XAU").then(function (r) { return r.json(); })
+    ]).then(function (a) {
+      var r = { inr: a[0].rates.INR, aed: a[0].rates.AED, gold: a[1].price, at: Date.now() };
+      showRates(r);
+      try { localStorage.setItem("saver-rates", JSON.stringify(r)); } catch (e) {}
+    }).catch(function () {});
+  }
+
+  function start() {
+    tick(); next();
+    setInterval(next, every); setInterval(tick, 5000);
+    weather(); setInterval(weather, 15 * 60000);
+    rates(); setInterval(rates, KEEP);
+  }
   fetch("backgrounds/mine/saver.json").then(function (r) { return r.json(); }).then(function (j) {
     if (j.slides && j.slides.length) slides = j.slides;
     if (j.seconds) every = Math.max(6, j.seconds) * 1000;
-  }).catch(function () {}).then(function () { document.fonts.ready.then(start); });
+  }).catch(function () {}).then(function () {
+    // an older list, or the built-in scenery: plain picture paths, the clock in its usual place
+    slides = slides.map(function (s) { return typeof s === "string" ? { src: s, clock: { x: "center", y: "top", size: 41 }, card: "bl" } : s; });
+    document.fonts.ready.then(start);
+  });
 })();
 </script>
 </body>

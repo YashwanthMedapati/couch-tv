@@ -131,15 +131,9 @@ class BridgeService : Service() {
         } else {
             @Suppress("DEPRECATION") Notification.Builder(this)
         }
-        val n = b.setContentTitle("Couch TV").setContentText("Phone remote is on")
+        note = b.setContentTitle("Couch TV").setContentText("Phone remote is on")
             .setSmallIcon(R.drawable.icon).setOngoing(true).build()
-        // The typed startForeground and FOREGROUND_SERVICE_TYPE_SPECIAL_USE only exist on Android 14.
-        // Older TVs (Android 9 to 13) crash on them, so they get the plain call.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(1, n)
-        }
+        foreground()
         val wm = applicationContext.getSystemService(WifiManager::class.java)
         wifiLock = runCatching { wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "couchtv").apply { acquire() } }.getOrNull()
         multicast = runCatching { wm.createMulticastLock("couchtv-mdns").apply { setReferenceCounted(false); acquire() } }.getOrNull()
@@ -180,7 +174,21 @@ class BridgeService : Service() {
         } catch (e: Exception) { Log.e("couchtv", "server failed to start", e) }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { startServer(); return START_STICKY }
+    // Every startForegroundService (the home and the screensaver each make one) must be answered with
+    // startForeground, even when the service is already running, or Android stops the app (seen on a TCL).
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int { foreground(); startServer(); return START_STICKY }
+
+    private var note: Notification? = null
+    private fun foreground() {
+        val n = note ?: return
+        // The typed startForeground and FOREGROUND_SERVICE_TYPE_SPECIAL_USE only exist on Android 14.
+        // Older TVs (Android 9 to 13) crash on them, so they get the plain call.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(1, n)
+        }
+    }
 
     override fun onDestroy() {
         server?.stop(); server = null
