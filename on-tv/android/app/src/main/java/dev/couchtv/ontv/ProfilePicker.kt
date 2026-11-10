@@ -12,7 +12,9 @@ import android.util.Log
 object ProfilePicker {
     private const val TAG = "couchtv.profiles"
     private val APPS = setOf("com.netflix.ninja", "com.amazon.amazonvideo.livingroom", "com.google.android.youtube.tv")
-    private val WHO_SCREEN = Regex("who.?s watching|who is watching|choose (?:a |your )?profile|select (?:a )?profile|choose an account|who.?s using", RegexOption.IGNORE_CASE)
+    private val WHO_SCREEN = Regex("who.?s watching|who is watching|choose (?:a |your )?profile|select (?:a )?profile|who.?s using", RegexOption.IGNORE_CASE)
+    // Never a sign-in list: "Choose an account to continue to Netflix" is Google sign-in, not a profile screen.
+    private val SIGN_IN = Regex("@|sign in|continue to", RegexOption.IGNORE_CASE)
     private val NODE = Regex("<node [^>]*>")
     private fun attr(node: String, name: String) = Regex("$name=\"([^\"]*)\"").find(node)?.groupValues?.get(1).orEmpty()
     private val lastRun = HashMap<String, Long>()
@@ -54,6 +56,7 @@ object ProfilePicker {
             val nodes = NODE.findAll(xml).map { it.value }.toList()
             if (nodes.isNotEmpty() && nodes.none { attr(it, "package") == pkg }) return   // the person left the app
             val labelled = nodes.map { (attr(it, "text").ifEmpty { attr(it, "content-desc") }) to it }.filter { it.first.isNotBlank() }
+            if (labelled.any { SIGN_IN.containsMatchIn(it.first) }) return
             if (labelled.any { WHO_SCREEN.containsMatchIn(it.first) }) {
                 val hit = names.firstNotNullOfOrNull { n -> labelled.firstOrNull { norm(it.first) == norm(n) || norm(it.first).startsWith(norm(n)) } }
                 if (hit == null) { Log.i(TAG, "profile screen in $pkg, none of $names on it"); return }
