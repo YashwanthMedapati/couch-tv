@@ -59,6 +59,7 @@
         <!-- The home screen page. Reachable as a normal screen; it is HOME only through the alias below. -->
         <activity
             android:name=".HomeActivity"
+            android:theme="@style/Couch.Home"
             android:exported="false"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"

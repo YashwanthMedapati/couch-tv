@@ -6,4 +6,8 @@
         <item name="android:colorBackground">@color/ground</item>
         <item name="android:windowShowWallpaper">false</item>
     </style>
+    <!-- The home: the scene picture shows the moment the window opens, before the page has loaded. -->
+    <style name="Couch.Home">
+        <item name="android:windowBackground">@drawable/splash_window</item>
+    </style>
 </resources>

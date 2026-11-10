@@ -57,10 +57,10 @@ class HomeActivity : Activity() {
             settings.textZoom = 100
             addJavascriptInterface(Native(), "TVOS")
             webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus() }
+                override fun onPageFinished(view: WebView, url: String) { ready = true; view.requestFocus(); if (!failed) main.postDelayed({ hideSplash() }, 350) }
                 override fun onReceivedError(view: WebView, req: WebResourceRequest, err: WebResourceError) {
                     // The server may still be starting: try again shortly.
-                    if (req.isForMainFrame) { ready = false; main.postDelayed({ load() }, 700) }
+                    if (req.isForMainFrame) { ready = false; failed = true; main.postDelayed({ load() }, 700) }
                 }
                 // Only the home page itself may load here: its restart() (a new look, scenes, timer)
                 // reloads it with location.replace, which was cancelled along with everything else.
@@ -76,7 +76,11 @@ class HomeActivity : Activity() {
             }
         }
         web = w
-        setContentView(w)
+        val root = android.widget.FrameLayout(this)
+        root.addView(w)
+        splash = makeSplash().also { root.addView(it) }
+        setContentView(root)
+        main.postDelayed({ hideSplash() }, 10_000)   // never stuck behind it, even if the page will not load
         hideBars()
         load()
         // Load the navigation sounds now, so the first key press does not wait for them.
@@ -93,7 +97,59 @@ class HomeActivity : Activity() {
 
     override fun onDestroy() { sound.execute { pool?.release(); pool = null }; super.onDestroy() }
 
-    private fun load() { web?.loadUrl("$base/tv/") }
+    private var failed = false
+    private fun load() { failed = false; web?.loadUrl("$base/tv/") }
+
+    /**
+     * The splash while the home page loads (a cold start: after a restart, or when Android closed the
+     * app): the night scene the home opens on, "Couch TV" rising in, and a greeting for whoever was
+     * picked last. Fades out into the page, which starts on the same picture.
+     */
+    private var splash: View? = null
+    private fun makeSplash(): View {
+        val dp = resources.displayMetrics.density
+        val box = android.widget.FrameLayout(this)
+        box.addView(android.widget.ImageView(this).apply {
+            setImageResource(R.drawable.splash_scene); scaleType = android.widget.ImageView.ScaleType.CENTER_CROP
+        })
+        box.addView(View(this).apply {
+            background = android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(0x33000000, 0x55000000, 0x99000000.toInt()))
+        })
+        val col = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL; gravity = android.view.Gravity.CENTER
+            alpha = 0f; translationY = 18 * dp
+        }
+        col.addView(android.widget.TextView(this).apply {
+            text = "Couch TV"; setTextColor(Color.WHITE); textSize = 52f; letterSpacing = 0.04f; gravity = android.view.Gravity.CENTER
+            typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+            setShadowLayer(18 * dp, 0f, 2 * dp, 0x66000000)
+        })
+        greeting()?.let { g ->
+            col.addView(android.widget.TextView(this).apply {
+                text = g; setTextColor(0xCCFFFFFF.toInt()); textSize = 18f; gravity = android.view.Gravity.CENTER
+                setPadding(0, (10 * dp).toInt(), 0, 0); setShadowLayer(12 * dp, 0f, 1 * dp, 0x66000000)
+            })
+        }
+        box.addView(col, android.widget.FrameLayout.LayoutParams(-1, -1))
+        col.animate().alpha(1f).translationY(0f).setDuration(700).setStartDelay(120)
+            .setInterpolator(android.view.animation.DecelerateInterpolator(2f)).start()
+        return box
+    }
+    private fun greeting(): String? {
+        val h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+        val part = if (h < 5) "Good evening" else if (h < 12) "Good morning" else if (h < 17) "Good afternoon" else "Good evening"
+        val name = runCatching {
+            val people = Store.people()
+            (0 until people.length()).map { people.getJSONObject(it) }.firstOrNull { it.optString("id") == Now.who }?.optString("name")
+        }.getOrNull()
+        return if (name.isNullOrBlank()) part else "$part, $name"
+    }
+    private fun hideSplash() {
+        val s = splash ?: return
+        splash = null
+        s.animate().alpha(0f).setDuration(500).withEndAction { (s.parent as? android.view.ViewGroup)?.removeView(s) }.start()
+    }
 
     override fun onResume() { super.onResume(); hideBars(); if (ready) js("window.tv && tv.resume()") }
     // the video background stops while an app is in front

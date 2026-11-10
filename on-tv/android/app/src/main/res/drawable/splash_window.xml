@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home's window before anything is drawn: the night scene, the same picture the home opens on. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ground" />
+    <item><bitmap android:src="@drawable/splash_scene" android:gravity="fill" /></item>
+</layer-list>
