@@ -10,8 +10,19 @@ import android.view.accessibility.AccessibilityEvent
  * across reboots, so the Home key keeps landing on this app's home with no computer involved.
  */
 class WatchService : AccessibilityService() {
-    override fun onServiceConnected() { connected = true; FireHome.catchUpAfterBoot() }
-    override fun onDestroy() { connected = false; super.onDestroy() }
+    private val screenOn = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: android.content.Context, i: android.content.Intent) {
+            FireHome.screenOnAt = System.currentTimeMillis()
+            android.util.Log.i("couchtv.firehome", "screen on")
+        }
+    }
+
+    override fun onServiceConnected() {
+        connected = true
+        registerReceiver(screenOn, android.content.IntentFilter(android.content.Intent.ACTION_SCREEN_ON))
+        FireHome.catchUpAfterBoot()
+    }
+    override fun onDestroy() { connected = false; runCatching { unregisterReceiver(screenOn) }; super.onDestroy() }
     override fun onInterrupt() {}
 
     /**
@@ -29,7 +40,9 @@ class WatchService : AccessibilityService() {
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (FireHome.isStockHome(e.packageName?.toString(), e.className?.toString())) FireHome.onStockHome()
+        val pkg = e.packageName?.toString(); val cls = e.className?.toString()
+        if (pkg == FireHome.GOOGLE_TV_HOME) android.util.Log.i("couchtv.firehome", "front: $cls, ${System.currentTimeMillis() - FireHome.screenOnAt} ms after screen on")
+        if (FireHome.isStockHome(pkg, cls) || FireHome.isWakeScreen(pkg, cls)) FireHome.onStockHome()
         ProfilePicker.appCameForward(e.packageName?.toString())   // Netflix, Prime, YouTube: pick the right profile
     }
 

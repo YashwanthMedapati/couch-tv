@@ -99,6 +99,16 @@ object FireHome {
         }.start()
     }
 
+    /**
+     * Waking from standby, Google TV's home first shows a start-up screen and its "Who's watching?"
+     * screen, and only then its home (about 1.5 s later on a TCL). Those two count as the TV's own
+     * home for 20 s after the screen comes on, so this home is up straight away instead.
+     */
+    @Volatile var screenOnAt = 0L
+    fun isWakeScreen(pkg: String?, cls: String?) = pkg == GOOGLE_TV_HOME &&
+        System.currentTimeMillis() - screenOnAt < 20_000 &&
+        (cls == "$GOOGLE_TV_HOME.coreservices.bootmode.DispatchActivity" || cls == "$GOOGLE_TV_HOME.profile.chooser.ProfileChooserActivity")
+
     /** Whether the watcher should take the Home key itself (this home is on and not standing aside). */
     fun takesHomeKey() = wanted && System.currentTimeMillis() >= asideUntil
 
@@ -209,9 +219,10 @@ object FireHome {
     private fun jump() {
         if (!wanted) return
         val now = System.currentTimeMillis()
-        if (now - lastJump < 1200) return   // one jump per press, not one per event
+        if (now - lastJump < 500) return   // one jump per press, not one per event
         if (now < asideUntil) return
         lastJump = now
+        Log.i(TAG, "jump, ${now - screenOnAt} ms after screen on")
         // If this home keeps falling back to the TV's own (it crashed, or will not open), stand aside
         // for ten minutes so the TV is never held in a loop.
         jumps.addLast(now)

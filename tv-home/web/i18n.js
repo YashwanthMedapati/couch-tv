@@ -223,7 +223,7 @@
     np_next: "Next",
     sound_head: "Sound",
     nav_sound: "Navigation sound",
-    nav_sound_system: "The TV's own",
+    nav_sound_system: "Couch TV sounds",
     nav_sound_soft: "Soft",
     nav_sound_off: "Off",
 

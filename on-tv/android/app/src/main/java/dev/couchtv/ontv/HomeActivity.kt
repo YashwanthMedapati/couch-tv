@@ -79,9 +79,19 @@ class HomeActivity : Activity() {
         setContentView(w)
         hideBars()
         load()
-        // Load the click sounds now, so the first key press does not wait for them.
-        sound.execute { runCatching { (getSystemService(AUDIO_SERVICE) as android.media.AudioManager).loadSoundEffects() } }
+        // Load the navigation sounds now, so the first key press does not wait for them.
+        sound.execute {
+            runCatching {
+                val p = android.media.SoundPool.Builder().setMaxStreams(3).setAudioAttributes(
+                    android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION).build()).build()
+                fx = intArrayOf(p.load(this, R.raw.nav_tick, 1), p.load(this, R.raw.nav_select, 1), p.load(this, R.raw.nav_back, 1))
+                pool = p
+            }
+        }
     }
+
+    override fun onDestroy() { sound.execute { pool?.release(); pool = null }; super.onDestroy() }
 
     private fun load() { web?.loadUrl("$base/tv/") }
 
@@ -91,7 +101,7 @@ class HomeActivity : Activity() {
     override fun onNewIntent(i: Intent) { super.onNewIntent(i); js("window.tv && tv.home()") }
 
     override fun dispatchKeyEvent(e: KeyEvent): Boolean {
-        if (e.keyCode == KeyEvent.KEYCODE_BACK) { if (e.action == KeyEvent.ACTION_UP && ready) js("window.tv && tv.back()"); return true }
+        if (e.keyCode == KeyEvent.KEYCODE_BACK) { if (e.action == KeyEvent.ACTION_UP && ready) js("window.tv && tv.back && (tv.backSound && tv.backSound(), tv.back())"); return true }
         // Long press MENU opens setup, so the home screen can always reach it.
         if (e.keyCode == KeyEvent.KEYCODE_MENU && e.action == KeyEvent.ACTION_UP && e.isLongPress) { startActivity(Intent(this, SetupActivity::class.java)); return true }
         return super.dispatchKeyEvent(e)
@@ -143,15 +153,19 @@ class HomeActivity : Activity() {
     }
 
     private val sound = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var pool: android.media.SoundPool? = null
+    @Volatile private var fx = IntArray(0)
+    /** Couch TV's own soft sounds (res/raw, made by couch-tv-tools/sounds/make_sounds.py): 1-4 move, 0 OK, 5 Back. */
     private fun playTick(dir: Int) {
+        val p = pool ?: return
         runCatching {
-            (getSystemService(AUDIO_SERVICE) as android.media.AudioManager).playSoundEffect(when (dir) {
-                1 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_UP
-                2 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_DOWN
-                3 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_LEFT
-                4 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_RIGHT
-                else -> android.media.AudioManager.FX_KEY_CLICK
-            })
+            when (dir) {
+                0 -> p.play(fx[1], 1f, 1f, 1, 0, 1f)
+                5 -> p.play(fx[2], 1f, 1f, 1, 0, 1f)
+                // up and down a touch lower than left and right, so the two directions feel different
+                1, 2 -> p.play(fx[0], 1f, 1f, 1, 0, 0.84f)
+                else -> p.play(fx[0], 1f, 1f, 1, 0, 1f)
+            }
         }
     }
 

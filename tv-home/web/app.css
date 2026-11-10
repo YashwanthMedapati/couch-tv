@@ -951,7 +951,14 @@ html.lighter .shelf-track, html.lighter .tile, html.lighter .ncard { transition-
    composite it without repainting. Not on a TV set to reduce motion. */
 @media (prefers-reduced-motion: no-preference) {
   html.lighter .app { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  /* Opening an app: its tile presses in and springs back, and the app row sinks away as the app comes
+     up. Back home, the row rises into place again (app.js leaveFor / backHome). Transform and opacity only. */
+  html .app.press.focus .face { animation: press 300ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+  #grid, #date { transition: transform 460ms cubic-bezier(0.34, 1.3, 0.64, 1), opacity 320ms var(--ease); }
+  html.away #grid { transform: translateY(2.5rem) scale(0.96); opacity: 0; }
+  html.away #date { opacity: 0; }
 }
+@keyframes press { 0% { transform: scale(1); } 35% { transform: scale(0.88); } 100% { transform: scale(1); } }
 /* panels that leaned on the blur to stay readable get a darker ground, and no soft shadow, instead */
 html.lighter .settings, html.lighter .smart { background: rgba(10, 8, 12, 0.94); }
 html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.lighter .sleep-menu, html.lighter .qbtn.set { background: rgba(28, 24, 30, 0.97); box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16); }

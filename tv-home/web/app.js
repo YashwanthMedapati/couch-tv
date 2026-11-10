@@ -1808,9 +1808,21 @@
       return;
     }
     opened(a.package);
-    if (TV && TV.launch(a.package)) return;
+    if (TV && TV.launch(a.package)) { leaveFor(el); return; }
     api("POST", "/api/launch", { app: a.id || a.package }).catch(function (e) { status(e.message); });
   }
+
+  // Opening an app: a press on its tile, and the home steps back until it is in front again (backHome).
+  var awayTimer = null, wentAway = false;
+  function leaveFor(el) {
+    var h = document.documentElement;
+    if (el) { el.classList.remove("press"); void el.offsetWidth; el.classList.add("press"); setTimeout(function () { el.classList.remove("press"); }, 400); }
+    h.classList.add("away"); wentAway = false;
+    clearTimeout(awayTimer);
+    // the app never came up (nothing paused the home): bring the row straight back
+    awayTimer = setTimeout(function () { if (!wentAway) h.classList.remove("away"); }, 2500);
+  }
+  function backHome() { clearTimeout(awayTimer); document.documentElement.classList.remove("away"); }
 
   // ---------------- Smart home: the rooms and scenes screen (smarthome.js) ----------------
   function openSmart() { zone = "smart"; clearFocus(); window.smartHome.open(); }
@@ -3137,13 +3149,15 @@
 
   // the native side calls these
   // Home on the remote also re-reads the lists, so an order arranged on the phone shows straight away
-  window.tv = { back: goHome, home: function () { if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+  window.tv = { back: goHome, home: function () { backHome(); if (zone === "settings") closeSettings(); else goHome(); refresh(); },
+    // the remote's Back key (HomeActivity): its own softer sound
+    backSound: function () { if (SOUND && SOUND_STYLE === "system" && TV && TV.tick) try { TV.tick(5); } catch (e) {} },
     noDream: function () { note(t("no_dream")); },
     // the remote's Settings/gear key, caught by the launcher natively (MainActivity.dispatchKeyEvent)
     settingsKey: function () { blip(0, 0); settingsKey(); },
-    resume: function () { okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },
+    resume: function () { backHome(); okReset(); refresh(); if (!OFFLINE) refreshQuick(); refreshWeather(); startVideo(); refreshMusic(); },
     // an app is in front: the video background stops until the home is back
-    pause: pauseVideo,
+    pause: function () { wentAway = true; pauseVideo(); },
     // the launcher's file picker has copied the chosen photos into its own storage (Home settings)
     photosAdded: function (names) { photosAdded(names); },
     // the launcher's updater has news (Updater.kt)
