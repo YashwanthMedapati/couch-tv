@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="watch_desc">Brings the Couch TV home screen back when the Home button opens Amazon\'s home. Reads nothing else.</string>
+    <string name="watch_desc">Makes the Home button open the Couch TV home screen, and brings it back when the TV opens its own home. It looks only at the Home key and at which screen comes forward; it reads nothing else.</string>
 </resources>

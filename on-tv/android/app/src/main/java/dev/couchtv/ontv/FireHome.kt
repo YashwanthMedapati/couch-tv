@@ -41,8 +41,17 @@ object FireHome {
     private val lock = Any()
     @Volatile private var running = false
     @Volatile private var lastJump = 0L
+    @Volatile private var asideUntil = 0L
+    private val jumps = ArrayDeque<Long>()
+
+    // Google TV / Android TV homes outrank the default-home setting (seen on a TCL Android TV 11), so
+    // the same watcher puts this home back over them. They stay installed and on: switching them
+    // off can boot-loop a Google TV (README, "If your TV loops after a restart").
+    const val GOOGLE_TV_HOME = "com.google.android.apps.tv.launcherx"
+    const val ANDROID_TV_HOME = "com.google.android.tvlauncher"
 
     val isFireTv: Boolean get() = Tv.hasPackage(AMAZON_HOME)
+    private val hasStockHome: Boolean get() = isFireTv || Tv.hasPackage(GOOGLE_TV_HOME) || Tv.hasPackage(ANDROID_TV_HOME)
 
     /** Usage access, the no-ADB way to see Amazon's home come forward. */
     val usageAllowed: Boolean
@@ -52,7 +61,7 @@ object FireHome {
         }.getOrDefault(false)
 
     private val wanted: Boolean
-        get() = isFireTv && App.homeEnabled(App.instance)
+        get() = hasStockHome && App.homeEnabled(App.instance)
 
     /**
      * Amazon's launcher package also holds Fire OS's Settings screens (`.ui.MainSettingsActivity`
@@ -60,8 +69,41 @@ object FireHome {
      */
     fun isAmazonHome(pkg: String?, cls: String?) = pkg == AMAZON_HOME && cls?.contains("Settings") != true
 
-    /** The WatchService saw Amazon's home come on screen. */
-    fun onAmazonHome() {
+    /** The TV's own home screen, not its other screens (Google's package also holds profile and setup screens). */
+    fun isStockHome(pkg: String?, cls: String?) = when (pkg) {
+        AMAZON_HOME -> isAmazonHome(pkg, cls)
+        GOOGLE_TV_HOME -> cls == "$GOOGLE_TV_HOME.home.HomeActivity" || cls == "$GOOGLE_TV_HOME.home.VanillaModeHomeActivity"
+        ANDROID_TV_HOME -> cls == "$ANDROID_TV_HOME.MainActivity"
+        else -> false
+    }
+
+    /**
+     * Just after a restart the TV's own home can come up before the watcher is bound, and that
+     * window event is never seen. So when it binds in the first minutes after boot, look at what
+     * last came forward (usage events, the grant this app gives itself over ADB): only if that is
+     * the TV's own home does this home go on top. An HDMI input or live TV is never covered.
+     */
+    fun catchUpAfterBoot() {
+        if (!wanted || android.os.SystemClock.elapsedRealtime() > 3 * 60_000L || !usageAllowed) return
+        Thread {
+            runCatching {
+                Thread.sleep(1500)
+                val usm = App.instance.getSystemService(UsageStatsManager::class.java)
+                val now = System.currentTimeMillis()
+                val events = usm.queryEvents(now - 5 * 60_000L, now)
+                val e = UsageEvents.Event(); var pkg: String? = null; var cls: String? = null
+                while (events.getNextEvent(e)) if (e.eventType == UsageEvents.Event.MOVE_TO_FOREGROUND) { pkg = e.packageName; cls = e.className }
+                Log.i(TAG, "bound after boot, last in front: $pkg/$cls")
+                if (isStockHome(pkg, cls)) jump()
+            }.onFailure { Log.w(TAG, "boot catch-up: ${it.message}") }
+        }.start()
+    }
+
+    /** Whether the watcher should take the Home key itself (this home is on and not standing aside). */
+    fun takesHomeKey() = wanted && System.currentTimeMillis() >= asideUntil
+
+    /** The WatchService saw the TV's own home come on screen. */
+    fun onStockHome() {
         if (wanted) jump()
     }
 
@@ -69,7 +111,7 @@ object FireHome {
     fun poke() {
         if (!wanted) return
         selfEnableWatch()
-        if (WatchService.connected) return   // event-driven: nothing to poll
+        if (WatchService.connected || !isFireTv) return   // event-driven; the polling fallbacks below are Fire OS only
         if (!(usageAllowed || Adb.everAllowed || Adb.paired)) return
         synchronized(lock) {
             if (running) return
@@ -168,7 +210,17 @@ object FireHome {
         if (!wanted) return
         val now = System.currentTimeMillis()
         if (now - lastJump < 1200) return   // one jump per press, not one per event
+        if (now < asideUntil) return
         lastJump = now
+        // If this home keeps falling back to the TV's own (it crashed, or will not open), stand aside
+        // for ten minutes so the TV is never held in a loop.
+        jumps.addLast(now)
+        while (jumps.size > 6) jumps.removeFirst()
+        if (jumps.size == 6 && now - jumps.first() < 15_000) {
+            asideUntil = now + 10 * 60_000L; jumps.clear()
+            Log.w(TAG, "jumped 6 times in 15 s: leaving the TV's own home alone for 10 minutes")
+            return
+        }
         App.openHome()
     }
 

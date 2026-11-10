@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- The Couch TV screensaver (on-TV app, SaverDream): full-screen photos that fade one into the next,
+     with the home's glass clock over them. The slide list is backgrounds/mine/saver.json (your own
+     pictures, made on a computer), else the home's built-in scenery. -->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: "Antonio"; font-weight: 300; src: url(fonts/antonio-latin-300.woff2) format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 100 900; src: url(fonts/inter-latin-wght-normal.woff2) format("woff2"); }
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
+  .slide { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 2400ms ease-in-out; }
+  .slide.on { opacity: 1; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0) 45%); }
+  .date { position: absolute; left: 0; right: 0; top: 5.5vh; text-align: center; font: 500 3.2vh "Inter", sans-serif;
+          color: rgba(255,255,255,0.92); text-shadow: 0 0.2vh 1vh rgba(0,0,0,0.35); letter-spacing: 0.02em; }
+  .clock { position: absolute; left: 0; right: 0; top: 10vh; text-align: center; white-space: nowrap;
+           font: 300 41vh/0.82 "Antonio", "Arial Narrow", sans-serif; letter-spacing: -0.02em;
+           filter: drop-shadow(0 0.6vh 2.6vh rgba(0,0,0,0.22)); }
+  .clock span { display: inline-block; padding: 0.2em 0; margin: -0.2em 0; }
+  .fill { color: transparent; -webkit-background-clip: text; background-clip: text; background-size: 100vw 100vh;
+          background-repeat: no-repeat; filter: brightness(1.25) saturate(1.1); opacity: 0.92; }
+  .rim { position: absolute; left: 0; right: 0; top: 0; color: rgba(255,255,255,0.1); -webkit-text-stroke: 0.15vh rgba(255,255,255,0.6); }
+</style>
+</head>
+<body>
+<img class="slide" id="a" alt=""><img class="slide" id="b" alt="">
+<div class="shade"></div>
+<div class="date" id="date"></div>
+<div class="clock" id="clock"><span class="fill" id="fill"></span><span class="rim" id="rim"></span></div>
+<script>
+(function () {
+  var BUILT_IN = ["scene-night", "scene-golden", "scene-water", "scene-fog", "scene-dawn", "grose-valley",
+    "vang-vieng-sunset", "aresquiers-beach", "albury-storm", "tessellated-pavement"].map(function (n) { return "backgrounds/" + n + ".jpg"; });
+  var slides = BUILT_IN, every = 12000, i = 0, front = document.getElementById("a"), back = document.getElementById("b");
+  var fill = document.getElementById("fill"), rim = document.getElementById("rim"), clock = document.getElementById("clock");
+
+  function hm() {
+    var d = new Date(), h = d.getHours() % 12 || 12, m = d.getMinutes();
+    return h + ":" + (m < 10 ? "0" : "") + m;
+  }
+  function tick() {
+    var t = hm();
+    if (fill.textContent !== t) { fill.textContent = t; rim.textContent = t; place(); }
+    document.getElementById("date").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
+  // The digits show the photo behind them: line the fill's copy of the photo up with the screen.
+  function place() {
+    var x = clock.offsetLeft + fill.offsetLeft, y = clock.offsetTop + fill.offsetTop;
+    fill.style.backgroundPosition = -x + "px " + -y + "px";
+    rim.style.left = fill.offsetLeft + "px"; rim.style.right = "auto";
+  }
+  function show(src) {
+    back.onload = function () {
+      back.classList.add("on"); front.classList.remove("on");
+      var t = front; front = back; back = t;
+      setTimeout(function () { fill.style.backgroundImage = 'url("' + src + '")'; }, 1200);   // halfway through the fade
+    };
+    back.src = src;
+  }
+  function next() { show(slides[i % slides.length]); i++; }
+
+  function start() { tick(); next(); setInterval(next, every); setInterval(tick, 5000); }
+  fetch("backgrounds/mine/saver.json").then(function (r) { return r.json(); }).then(function (j) {
+    if (j.slides && j.slides.length) slides = j.slides;
+    if (j.seconds) every = Math.max(6, j.seconds) * 1000;
+  }).catch(function () {}).then(function () { document.fonts.ready.then(start); });
+})();
+</script>
+</body>
+</html>

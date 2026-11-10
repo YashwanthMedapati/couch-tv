@@ -364,6 +364,8 @@ html.still .tile.focus .face, html.still .tile.focus .face::after { animation: n
   font-size: 1.25rem; line-height: 1; font-weight: 700; color: #fff; text-shadow: 0 0.0625rem 0.25rem rgba(0, 0, 0, 0.25);
   box-shadow: inset 0 0 0 0.0625rem rgba(255, 255, 255, 0.28);
 }
+.avatar { position: relative; overflow: hidden; }
+.avatar img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
 .people.head { padding: 0.375rem; border-radius: 50%; transition: transform 200ms var(--ease), box-shadow 200ms var(--ease); }
 .people.head .avatar { width: 4.75rem; height: 4.75rem; font-size: 2.125rem; }
 .theme-night .people.head.focus, .people.head.focus { transform: scale(1.08); box-shadow: 0 0 0 0.1875rem #fff, 0 0.75rem 1.75rem rgba(0, 0, 0, 0.4); }
@@ -945,6 +947,11 @@ html.lighter .qbtn.focus { box-shadow: none; }
 html.lighter .ncard.focus { box-shadow: 0 0 0 0.1875rem #fff; }
 html.lighter.theme-night .app.focus .face { box-shadow: 0 0 0 0.25rem #fff; }
 html.lighter .shelf-track, html.lighter .tile, html.lighter .ncard { transition-duration: 160ms; }
+/* A small spring on the focused app: overshoots a little and settles. Transform only, so slow GPUs
+   composite it without repainting. Not on a TV set to reduce motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html.lighter .app { transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+}
 /* panels that leaned on the blur to stay readable get a darker ground, and no soft shadow, instead */
 html.lighter .settings, html.lighter .smart { background: rgba(10, 8, 12, 0.94); }
 html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.lighter .sleep-menu, html.lighter .qbtn.set { background: rgba(28, 24, 30, 0.97); box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16); }

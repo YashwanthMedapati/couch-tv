@@ -287,6 +287,35 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         .put("ask", JSONObject().put("enabled", Store.bool("ask_enabled")).put("has_key", !Store.str("ask_key").isNullOrEmpty()).put("model", Ask.MODEL))
         .put("phones", Auth.phoneCount()).put("port", Store.port).put("adb", JSONObject(Adb.status()))
 
+    /**
+     * One person: id, name and an optional photo. The photo is a picture bundled with the home
+     * (`people/<file>`, served at /tv/people/) or an https address. A save that leaves the photo
+     * out (a rename from the home's settings) keeps the one already stored for that id.
+     */
+    private fun cleanPerson(p: JSONObject, i: Int, nameMax: Int, idMax: Int): JSONObject? {
+        val name = p.optString("name").trim().take(nameMax)
+        if (name.isEmpty()) return null
+        val id = p.optString("id").ifEmpty { "person${i + 1}" }.take(idMax)
+        val out = JSONObject().put("id", id).put("name", name)
+        val old = stored(id)
+        val photo = if (p.has("photo")) p.optString("photo").trim() else old?.optString("photo").orEmpty()
+        if (photo.length <= 300 && (Regex("^people/[A-Za-z0-9._-]+$").matches(photo) || photo.startsWith("https://"))) out.put("photo", photo)
+        // A guest or kids profile: the only apps shown while it is picked, and its kind.
+        val apps = if (p.has("apps")) p.optJSONArray("apps") else old?.optJSONArray("apps")
+        if (apps != null) out.put("apps", JSONArray((0 until minOf(apps.length(), 30)).map { apps.optString(it) }.filter { Regex("^[A-Za-z0-9._]{1,120}$").matches(it) }))
+        for (k in listOf("kid", "guest")) if ((if (p.has(k)) p else old)?.optBoolean(k) == true) out.put(k, true)
+        // Their profile names inside Netflix, Prime Video and YouTube when not their own name (ProfilePicker).
+        val names = if (p.has("app_profiles")) p.optJSONArray("app_profiles") else old?.optJSONArray("app_profiles")
+        if (names != null) out.put("app_profiles", JSONArray((0 until minOf(names.length(), 10)).map { names.optString(it).trim().take(40) }.filter { it.isNotEmpty() }))
+        return out
+    }
+
+    private fun stored(id: String): JSONObject? {
+        val now = Store.people()
+        for (i in 0 until now.length()) now.optJSONObject(i)?.takeIf { it.optString("id") == id }?.let { return it }
+        return null
+    }
+
     /** {"people": [...]} replaces the list; {"order": [ids]} only reorders it. */
     private fun savePeople(b: JSONObject) {
         val list = b.optJSONArray("people") ?: run {
@@ -301,8 +330,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
         val clean = JSONArray()
         for (i in 0 until minOf(list.length(), 12)) {
             val p = list.optJSONObject(i) ?: continue
-            val name = p.optString("name").trim().take(40)
-            if (name.isNotEmpty()) clean.put(JSONObject().put("id", p.optString("id").ifEmpty { "person${i + 1}" }.take(32)).put("name", name))
+            cleanPerson(p, i, 40, 32)?.let { clean.put(it) }
         }
         Store.putStr("people", clean.toString())
         Now.push()
@@ -318,8 +346,7 @@ class Server(private val ctx: Context, port: Int) : NanoWSD(port) {
             val clean = JSONArray()
             for (i in 0 until minOf(arr.length(), 8)) {
                 val p = arr.optJSONObject(i) ?: continue
-                val name = p.optString("name").trim().take(30)
-                if (name.isNotEmpty()) clean.put(JSONObject().put("id", p.optString("id").ifEmpty { "person${i + 1}" }.take(30)).put("name", name))
+                cleanPerson(p, i, 30, 30)?.let { clean.put(it) }
             }
             if (clean.length() > 0) Store.putStr("people", clean.toString())
         }

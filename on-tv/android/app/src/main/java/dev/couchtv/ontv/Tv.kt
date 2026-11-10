@@ -59,8 +59,13 @@ object Tv {
     } catch (e: Exception) { emptySet() }
 
     fun tvLaunchables(): List<android.content.pm.ResolveInfo> {
-        val q = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-        return ctx.packageManager.queryIntentActivities(q, 0).distinctBy { it.activityInfo.packageName }
+        val pm = ctx.packageManager
+        val tv = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
+        // Phone apps someone installed themselves (a browser such as Brave has no TV launcher entry).
+        // System apps with only a phone entry are left out: on a TV they are setup and maker clutter.
+        val phone = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .filter { it.activityInfo.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM == 0 && it.activityInfo.packageName != ctx.packageName }
+        return (tv + phone).distinctBy { it.activityInfo.packageName }
     }
 
     /** Opens an app. ADB when connected (works from the background on every TV), else an intent. */

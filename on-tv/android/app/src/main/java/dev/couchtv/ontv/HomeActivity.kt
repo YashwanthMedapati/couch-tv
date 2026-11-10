@@ -79,6 +79,8 @@ class HomeActivity : Activity() {
         setContentView(w)
         hideBars()
         load()
+        // Load the click sounds now, so the first key press does not wait for them.
+        sound.execute { runCatching { (getSystemService(AUDIO_SERVICE) as android.media.AudioManager).loadSoundEffects() } }
     }
 
     private fun load() { web?.loadUrl("$base/tv/") }
@@ -131,8 +133,26 @@ class HomeActivity : Activity() {
         }
         @JavascriptInterface fun openSettings(): Boolean = runCatching { Tv.openSettings() }.isSuccess
         @JavascriptInterface fun version(): String = BuildConfig.VERSION_NAME
+        /**
+         * Android's own navigation sound, like the TV launcher's (follows the TV's system sounds switch). 1 up, 2 down, 3 left, 4 right, else OK.
+         * Played on a background thread: the page waits for every bridge call, and the audio call can take a while.
+         */
+        @JavascriptInterface fun tick(dir: Int): Boolean { sound.execute { playTick(dir) }; return true }
         @JavascriptInterface fun keep(key: String, value: String) { getSharedPreferences("page", MODE_PRIVATE).edit().putString(key, value).apply() }
         @JavascriptInterface fun kept(key: String): String? = getSharedPreferences("page", MODE_PRIVATE).getString(key, null)
+    }
+
+    private val sound = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private fun playTick(dir: Int) {
+        runCatching {
+            (getSystemService(AUDIO_SERVICE) as android.media.AudioManager).playSoundEffect(when (dir) {
+                1 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_UP
+                2 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_DOWN
+                3 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_LEFT
+                4 -> android.media.AudioManager.FX_FOCUS_NAVIGATION_RIGHT
+                else -> android.media.AudioManager.FX_KEY_CLICK
+            })
+        }
     }
 
     private fun tvApps(): List<ResolveInfo> = Tv.tvLaunchables().filter { it.activityInfo.packageName != packageName }

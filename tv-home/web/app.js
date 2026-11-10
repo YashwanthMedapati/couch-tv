@@ -1076,7 +1076,9 @@
     return PALETTE[h % PALETTE.length];
   }
   function avatarHTML(p) {
-    return '<span class="avatar" style="background:' + esc(colourOf(p)) + '">' + esc((p.name || "?").trim().charAt(0).toUpperCase()) + "</span>";
+    // A photo (people/<file> bundled with the home, or https) covers the letter; if it fails to load it goes and the letter shows.
+    var img = p.photo ? '<img src="' + esc(p.photo) + '" alt="" onerror="this.remove()">' : "";
+    return '<span class="avatar" style="background:' + esc(colourOf(p)) + '">' + esc((p.name || "?").trim().charAt(0).toUpperCase()) + img + "</span>";
   }
   function whoIndex() { return Math.max(0, PEOPLE.map(function (p) { return p.id; }).indexOf(who)); }
 
@@ -1121,6 +1123,7 @@
     try { localStorage.setItem("tvhome.who", who); } catch (e) {}
     if (!NOBODY) api("POST", "/api/who", { who: who }).catch(function () {});
     renderShelf();
+    renderGrid();   // a guest or kids profile has its own, shorter app row
   }
   // The order of the names: kept by the bridge (the phone's People sheet uses the same list), or on
   // this TV when there is no bridge. "pending" means the bridge has not heard about it yet.
@@ -1186,7 +1189,12 @@
   }
   function isNew(pkg) { return newApps.indexOf(pkg) >= 0; }
   // The TV's apps less the ones hidden in Home settings (they come back from the Apps list there).
-  function shownApps() { return data.apps.filter(function (a) { return HIDDEN_TV.indexOf(a.package) < 0; }); }
+  // A person with an "apps" list (a guest or kids profile) sees only those apps while they are picked.
+  function shownApps() {
+    var me = PEOPLE.filter(function (p) { return p.id === who; })[0];
+    var only = me && Array.isArray(me.apps) && me.apps.length ? me.apps : null;
+    return data.apps.filter(function (a) { return HIDDEN_TV.indexOf(a.package) < 0 && (!only || only.indexOf(a.package) >= 0); });
+  }
   // The gear tile: always there, whatever the TV calls its own settings app. OK opens a small menu,
   // Home settings (this page's own) or TV settings (Android's).
   function gearItem() { return { kind: "gear", name: t("settings"), package: SETTINGS_PKG }; }

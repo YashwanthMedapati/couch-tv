@@ -247,6 +247,8 @@ object Adb {
         io.execute {
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} SYSTEM_ALERT_WINDOW allow", 8000) }
             runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} GET_USAGE_STATS allow", 8000) }
+            // TCL's boot manager (TclAppBoot) blocks the boot receiver and the home watch without this; unknown op elsewhere, harmless.
+            runCatching { shell("appops set ${BuildConfig.APPLICATION_ID} APP_AUTO_START allow", 8000) }
             if (Build.VERSION.SDK_INT >= 30) runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} android.permission.WRITE_SECURE_SETTINGS", 8000) }
             runCatching { shell("pm grant ${BuildConfig.APPLICATION_ID} " + if (Build.VERSION.SDK_INT >= 29) "android.permission.READ_TV_LISTINGS" else "com.android.providers.tv.permission.READ_EPG_DATA", 8000) }
             FireHome.poke()
