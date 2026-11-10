@@ -48,7 +48,9 @@ object ProfilePicker {
     private fun pick(pkg: String, names: List<String>) {
         Thread.sleep(2500)   // the app's first screen
         repeat(4) {
-            val xml = Adb.shell("uiautomator dump /sdcard/couch-ui.xml >/dev/null 2>&1; cat /sdcard/couch-ui.xml", 12_000)
+            // Shell-private temp folder (not /sdcard, which other apps can read), removed straight after.
+            val f = "/data/local/tmp/couch-ui.xml"
+            val xml = Adb.shell("uiautomator dump $f >/dev/null 2>&1; cat $f; rm -f $f", 12_000)
             val nodes = NODE.findAll(xml).map { it.value }.toList()
             if (nodes.isNotEmpty() && nodes.none { attr(it, "package") == pkg }) return   // the person left the app
             val labelled = nodes.map { (attr(it, "text").ifEmpty { attr(it, "content-desc") }) to it }.filter { it.first.isNotBlank() }
